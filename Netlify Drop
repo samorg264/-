@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ניהול קטלוג מוצרים</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #f4f6f9;
+            padding: 15px;
+            color: #333;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        .card {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus, select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .btn-primary {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #f39c12;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+            padding: 6px 10px;
+            font-size: 12px;
+            width: auto;
+        }
+        .preview-img {
+            max-width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-top: 8px;
+            display: none;
+        }
+        .status-msg {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .alert-info { background: #e1f5fe; color: #0288d1; }
+        .alert-warn { background: #fff3e0; color: #f57c00; }
+
+        /* רשימת מוצרים */
+        .product-list {
+            margin-top: 10px;
+        }
+        .product-item {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .product-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-left: 10px;
+            background-color: #eee;
+        }
+        .product-info {
+            flex-grow: 1;
+        }
+        .product-info strong {
+            display: block;
+            font-size: 15px;
+        }
+        .product-info span {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📦 קטלוג מוצרים</h2>
+
+    <div class="card">
+        <div id="statusMessage" class="status-msg"></div>
+
+        <form id="productForm">
+            <div class="form-group">
+                <label for="code">קוד מוצר (ברקוד)</label>
+                <input type="number" id="code" placeholder="סרוק או הקלד קוד" required oninput="checkExistingCode()">
+            </div>
+
+            <div class="form-group">
+                <label for="name">שם המוצר</label>
+                <input type="text" id="name" placeholder="לדוגמה: חלב 3%" required>
+            </div>
+
+            <div class="form-group">
+                <label for="category">קטגוריה</label>
+                <select id="category" required>
+                    <option value="">בחר קטגוריה...</option>
+                    <option value="מוצרי חלב">מוצרי חלב</option>
+                    <option value="לחמים ומאפים">לחמים ומאפים</option>
+                    <option value="ירקות ופירות">ירקות ופירות</option>
+                    <option value="משקאות">משקאות</option>
+                    <option value="חטיפים ומתווקים">חטיפים ומתווקים</option>
+                    <option value="ניקיון ובית">ניקיון ובית</option>
+                    <option value="כללי">כללי</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="image">תמונה (צילום/קובץ)</label>
+                <input type="file" id="image" accept="image/*" capture="environment" onchange="previewImage(event)">
+                <img id="imgPreview" class="preview-img" alt="תצוגה מקדימה">
+            </div>
+
+            <button type="submit" id="saveBtn" class="btn btn-primary">➕ הוסף מוצר</button>
+            <button type="button" id="resetBtn" class="btn btn-secondary" onclick="resetForm()">🔄 נקה / מוצר חדש</button>
+        </form>
+    </div>
+
+    <h3>מוצרים במאגר (<span id="productCount">0</span>)</h3>
+    <div class="product-list" id="productList"></div>
+</div>
+
+<script>
+    let products = JSON.parse(localStorage.getItem('supermarket_products')) || [];
+    let currentImageData = "";
+    let isEditMode = false;
+
+    window.onload = function() {
+        renderProducts();
+    };
+
+    // המרת תמונה ל-Base64 לשמירה במכשיר
+    function previewImage(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImageData = e.target.result;
+                const imgElement = document.getElementById('imgPreview');
+                imgElement.src = currentImageData;
+                imgElement.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // בדיקה אוטומטית בזמן הקלדת קוד אם המוצר כבר קיים
+    function checkExistingCode() {
+        const codeInput = document.getElementById('code').value.trim();
+        const msgDiv = document.getElementById('statusMessage');
+        const saveBtn = document.getElementById('saveBtn');
+
+        if (!codeInput) {
+            msgDiv.style.display = 'none';
+            return;
+        }
+
+        const existing = products.find(p => p.code === codeInput);
+
+        if (existing) {
+            isEditMode = true;
+            msgDiv.className = 'status-msg alert-warn';
+            msgDiv.innerHTML = `⚠️ <strong>קוד זה כבר קיים!</strong><br>הנך במצב עדכון עבור: "${existing.name}".`;
+            msgDiv.style.display = 'block';
+
+            // מילוי שאר השדות בנתונים הקיימים
+            document.getElementById('name').value = existing.name;
+            document.getElementById('category').value = existing.category;
+            if (existing.image) {
+                currentImageData = existing.image;
+                const imgElement = document.getElementById('imgPreview');
+                imgElement.src = existing.image;
+                imgElement.style.display = 'block';
+            }
+
+            saveBtn.innerText = "✏️ עדכן מוצר קיים";
+            saveBtn.className = "btn btn-warning";
+        } else if (isEditMode) {
+            // אם המשתמש שינה את הקוד לקוד חדש
+            isEditMode = false;
+            msgDiv.style.display = 'none';
+            saveBtn.innerText = "➕ הוסף מוצר";
+            saveBtn.className = "btn btn-primary";
+        }
+    }
+
+    // שמירה / עדכון מוצר
+    document.getElementById('productForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const code = document.getElementById('code').value.trim();
+        const name = document.getElementById('name').value.trim();
+        const category = document.getElementById('category').value;
+
+        const existingIndex = products.findIndex(p => p.code === code);
+
+        const productData = {
+            code: code,
+            name: name,
+            category: category,
+            image: currentImageData
+        };
+
+        if (existingIndex !== -1) {
+            // עדכון מוצר קיים
+            products[existingIndex] = productData;
+        } else {
+            // הוספת מוצר חדש
+            products.unshift(productData);
+        }
+
+        localStorage.setItem('supermarket_products', JSON.stringify(products));
+
+        // איפוס מהיר לעבודה ברצף
+        resetForm();
+        renderProducts();
+
+        // הודעת הצלחה קצרה
+        const msgDiv = document.getElementById('statusMessage');
+        msgDiv.className = 'status-msg alert-info';
+        msgDiv.innerHTML = '✅ המוצר נשמר בהצלחה! אפשר להזין את המוצר הבא.';
+        msgDiv.style.display = 'block';
+        setTimeout(() => { msgDiv.style.display = 'none'; }, 2500);
+    });
+
+    // ניקוי טופס לעבודה ברצף
+    function resetForm() {
+        document.getElementById('productForm').reset();
+        document.getElementById('imgPreview').style.display = 'none';
+        document.getElementById('imgPreview').src = '';
+        currentImageData = "";
+        isEditMode = false;
+
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.innerText = "➕ הוסף מוצר";
+        saveBtn.className = "btn btn-primary";
+
+        document.getElementById('statusMessage').style.display = 'none';
+        document.getElementById('code').focus(); // פוקוס חזרה לקוד לזרימת עבודה מהירה
+    }
+
+    // טעינת המוצרים לרשימה
+    function renderProducts() {
+        const listDiv = document.getElementById('productList');
+        document.getElementById('productCount').innerText = products.length;
+        listDiv.innerHTML = '';
+
+        products.forEach((p, index) => {
+            const item = document.createElement('div');
+            item.className = 'product-item';
+            
+            const imgSrc = p.image ? p.image : 'https://via.placeholder.com/50?text=אין+תמונה';
+
+            item.innerHTML = `
+                <img src="${imgSrc}" alt="${p.name}">
+                <div class="product-info">
+                    <strong>${p.name}</strong>
+                    <span>קוד: ${p.code} | קטגוריה: ${p.category}</span>
+                </div>
+                <button class="btn btn-danger" onclick="deleteProduct(${index})">מחק</button>
+            `;
+            listDiv.appendChild(item);
+        });
+    }
+
+    // מחיקת מוצר
+    function deleteProduct(index) {
+        if (confirm('בטוח שברצונך למחוק מוצר זה?')) {
+            products.splice(index, 1);
+            localStorage.setItem('supermarket_products', JSON.stringify(products));
+            renderProducts();
+        }
+    }
+</script>
+
+</body>
+</html>
